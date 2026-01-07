@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# uv
+uv.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.ruff_cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# Data
+data/
+
+# Streamlit
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Claude Code exports
+*-this-is-a-python-app-*.txt
+*.conversation.txt
+
+# Editor backups
+*.bak
+*.orig

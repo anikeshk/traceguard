@@ -4,12 +4,35 @@ import logging
 from datetime import datetime
 
 import httpx
+from packageurl import PackageURL
 
 from src.cve_sources.base import CVEData, CVESource
 
 logger = logging.getLogger(__name__)
 
 OSV_API_BASE = "https://api.osv.dev/v1"
+
+
+def _ecosystem_to_purl_type(ecosystem: str) -> str:
+    """Convert ecosystem name to PURL type.
+
+    Args:
+        ecosystem: Ecosystem name (e.g., "PyPI", "npm", "Maven")
+
+    Returns:
+        PURL type string (e.g., "pypi", "npm", "maven")
+    """
+    ecosystem_map = {
+        "PyPI": "pypi",
+        "npm": "npm",
+        "Maven": "maven",
+        "Go": "golang",
+        "RubyGems": "gem",
+        "NuGet": "nuget",
+        "Cargo": "cargo",
+        "Composer": "composer",
+    }
+    return ecosystem_map.get(ecosystem, ecosystem.lower())
 
 
 class OSVSource(CVESource):
@@ -35,9 +58,11 @@ class OSVSource(CVESource):
         query: dict = {}
 
         if package_name:
-            query["package"] = {"name": package_name}
-            if ecosystem:
-                query["package"]["ecosystem"] = ecosystem
+            # Use PURL format for better standardization
+            purl_type = _ecosystem_to_purl_type(ecosystem) if ecosystem else "pypi"
+            purl = PackageURL(type=purl_type, name=package_name)
+            query["package"] = {"purl": str(purl)}
+            logger.debug(f"OSV query with PURL: {query}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
@@ -84,15 +109,28 @@ class OSVSource(CVESource):
         ecosystem: str = "PyPI",
     ) -> list[CVEData]:
         """Query OSV for vulnerabilities affecting a specific package."""
-        query: dict = {
-            "package": {
-                "name": package_name,
-                "ecosystem": ecosystem,
-            }
-        }
+        # Convert ecosystem to PURL type
+        purl_type = _ecosystem_to_purl_type(ecosystem)
 
-        if version:
-            query["version"] = version
+        # Handle npm scoped packages (e.g., @angular/core)
+        if purl_type == "npm" and "/" in package_name:
+            namespace, name = package_name.split("/", 1)
+            namespace = namespace.lstrip("@")
+            if version:
+                purl = PackageURL(
+                    type=purl_type, namespace=namespace, name=name, version=version
+                )
+            else:
+                purl = PackageURL(type=purl_type, namespace=namespace, name=name)
+        else:
+            # Create PURL with or without version
+            if version:
+                purl = PackageURL(type=purl_type, name=package_name, version=version)
+            else:
+                purl = PackageURL(type=purl_type, name=package_name)
+
+        query: dict = {"package": {"purl": str(purl)}}
+        logger.debug(f"OSV query_by_package with PURL: {query}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:

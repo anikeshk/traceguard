@@ -39,7 +39,7 @@ class GitHubClient:
         """List all repositories accessible by the authenticated user."""
         repositories: list[Repository] = []
         url = f"{self.BASE_URL}/user/repos"
-        params = {"per_page": 100, "sort": "updated"}
+        params = {"per_page": 10, "sort": "updated", "affiliation": "owner"}
 
         async with httpx.AsyncClient() as client:
             response = await client.get(

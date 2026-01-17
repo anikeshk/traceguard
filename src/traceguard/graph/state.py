@@ -32,6 +32,31 @@ class OwnerData(TypedDict):
     name: str | None
 
 
+class CVESummaryData(TypedDict):
+    """Developer-friendly CVE summary from OpenAI."""
+
+    alert_number: int
+    title: str
+    what_is_vulnerable: str
+    why_it_matters: str
+    repo_impact: str
+    recommended_action: str
+    urgency_signal: str
+
+
+class JiraTicketData(TypedDict):
+    """Jira ticket creation result."""
+
+    alert_number: int
+    ticket_key: str
+    ticket_url: str
+    summary: str
+    priority: str
+    assignee: str | None
+    dry_run: bool
+    preview_payload: dict | None
+
+
 class AuditEntry(TypedDict):
     """
     Single audit trail entry recorded by each node.
@@ -68,6 +93,8 @@ class TraceGuardState(TypedDict):
         "pending",
         "fetching_alerts",
         "resolving_owner",
+        "summarizing_cves",
+        "creating_tickets",
         "completed",
         "failed",
     ]
@@ -76,10 +103,11 @@ class TraceGuardState(TypedDict):
     # Agent outputs (populated as graph executes)
     alerts: list[AlertData]
     owner: OwnerData | None
+    cve_summaries: list[CVESummaryData] | None
+    jira_tickets: list[JiraTicketData] | None
 
-    # Future agent outputs (placeholders for extensibility)
-    cve_summaries: list[dict] | None
-    jira_ticket: dict | None
+    # Configuration
+    dry_run: bool
 
     # Audit trail (appended by each node)
     audit_trail: list[AuditEntry]

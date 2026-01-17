@@ -16,7 +16,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from traceguard.db.models import Job, Alert, Owner, JobStatus, AuditArtifact
+from traceguard.db.models import Job, Alert, Owner, JobStatus, AuditArtifact, JiraTicket
 from traceguard.graph.state import TraceGuardState
 from traceguard.graph.workflow import compile_workflow
 
@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 
 async def run_traceguard_workflow(
-    job_id: int, session: AsyncSession
+    job_id: int,
+    session: AsyncSession,
+    dry_run: bool = False,
 ) -> TraceGuardState:
     """
     Execute the TraceGuard workflow for a job.
@@ -39,6 +41,7 @@ async def run_traceguard_workflow(
     Args:
         job_id: The database ID of the job to process
         session: Async SQLAlchemy session for database operations
+        dry_run: If True, Jira tickets will be previewed but not created
 
     Returns:
         The final state after workflow execution
@@ -64,7 +67,8 @@ async def run_traceguard_workflow(
         "alerts": [],
         "owner": None,
         "cve_summaries": None,
-        "jira_ticket": None,
+        "jira_tickets": None,
+        "dry_run": dry_run,
         "audit_trail": [],
     }
 
@@ -105,6 +109,8 @@ async def persist_workflow_results(
         "pending": JobStatus.PENDING,
         "fetching_alerts": JobStatus.FETCHING_ALERTS,
         "resolving_owner": JobStatus.RESOLVING_OWNER,
+        "summarizing_cves": JobStatus.SUMMARIZING_CVES,
+        "creating_tickets": JobStatus.CREATING_TICKETS,
         "completed": JobStatus.COMPLETED,
         "failed": JobStatus.FAILED,
     }
@@ -141,10 +147,40 @@ async def persist_workflow_results(
         session.add(owner)
 
     await session.flush()
+
+    # Save Jira tickets (need to do this after flush to get alert IDs)
+    jira_tickets = state.get("jira_tickets") or []
+    if jira_tickets:
+        # Build alert lookup by number
+        alert_lookup: dict[int, int] = {}
+        result = await session.execute(
+            select(Alert).where(Alert.job_id == job.id)
+        )
+        for alert in result.scalars().all():
+            alert_lookup[alert.alert_number] = alert.id
+
+        for ticket_data in jira_tickets:
+            alert_id = alert_lookup.get(ticket_data["alert_number"])
+            if alert_id:
+                ticket = JiraTicket(
+                    job_id=job.id,
+                    alert_id=alert_id,
+                    ticket_key=ticket_data["ticket_key"],
+                    ticket_url=ticket_data["ticket_url"],
+                    summary=ticket_data["summary"],
+                    priority=ticket_data["priority"],
+                    assignee=ticket_data["assignee"],
+                    dry_run=ticket_data["dry_run"],
+                )
+                session.add(ticket)
+
+        await session.flush()
+
     logger.info(
         f"Persisted results for job {job.id}: "
         f"{len(state.get('alerts', []))} alerts, "
-        f"owner={'yes' if state.get('owner') else 'no'}"
+        f"owner={'yes' if state.get('owner') else 'no'}, "
+        f"{len(jira_tickets)} jira tickets"
     )
 
 

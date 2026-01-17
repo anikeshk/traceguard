@@ -8,7 +8,12 @@ The graph determines the order of operations and handles conditional routing.
 from langgraph.graph import StateGraph, END
 
 from traceguard.graph.state import TraceGuardState
-from traceguard.graph.nodes import security_intake_node, ownership_resolution_node
+from traceguard.graph.nodes import (
+    security_intake_node,
+    ownership_resolution_node,
+    cve_summarization_node,
+    jira_ticket_creation_node,
+)
 
 
 def should_continue(state: TraceGuardState) -> str:
@@ -41,17 +46,23 @@ def create_workflow() -> StateGraph:
             +---(failed)---> [END]
             |
             v (continue)
+        cve_summarization
+            |
+            +---(failed)---> [END]
+            |
+            v (continue)
+        jira_ticket_creation
+            |
+            v
         [END]
-
-    Future extensions can add nodes for:
-    - CVE summarization (between intake and ownership)
-    - Jira ticket creation (after ownership resolution)
     """
     workflow = StateGraph(TraceGuardState)
 
     # Add nodes
     workflow.add_node("security_intake", security_intake_node)
     workflow.add_node("ownership_resolution", ownership_resolution_node)
+    workflow.add_node("cve_summarization", cve_summarization_node)
+    workflow.add_node("jira_ticket_creation", jira_ticket_creation_node)
 
     # Set entry point
     workflow.set_entry_point("security_intake")
@@ -71,10 +82,23 @@ def create_workflow() -> StateGraph:
         "ownership_resolution",
         should_continue,
         {
-            "continue": END,
+            "continue": "cve_summarization",
             "end": END,
         },
     )
+
+    # Add conditional edges from cve_summarization
+    workflow.add_conditional_edges(
+        "cve_summarization",
+        should_continue,
+        {
+            "continue": "jira_ticket_creation",
+            "end": END,
+        },
+    )
+
+    # jira_ticket_creation always ends the workflow
+    workflow.add_edge("jira_ticket_creation", END)
 
     return workflow
 

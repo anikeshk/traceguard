@@ -14,6 +14,8 @@ class JobStatus(str, Enum):
     PENDING = "pending"
     FETCHING_ALERTS = "fetching_alerts"
     RESOLVING_OWNER = "resolving_owner"
+    SUMMARIZING_CVES = "summarizing_cves"
+    CREATING_TICKETS = "creating_tickets"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -44,6 +46,9 @@ class Job(Base):
         back_populates="job", cascade="all, delete-orphan", uselist=False
     )
     audit_artifacts: Mapped[list["AuditArtifact"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+    jira_tickets: Mapped[list["JiraTicket"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
 
@@ -81,6 +86,9 @@ class Alert(Base):
     )
 
     job: Mapped["Job"] = relationship(back_populates="alerts")
+    jira_ticket: Mapped[Optional["JiraTicket"]] = relationship(
+        back_populates="alert", uselist=False
+    )
 
 
 class Owner(Base):
@@ -127,3 +135,31 @@ class AuditArtifact(Base):
     )
 
     job: Mapped["Job"] = relationship(back_populates="audit_artifacts")
+
+
+class JiraTicket(Base):
+    """
+    Jira ticket created for a security alert.
+
+    Links alerts to their corresponding Jira issues for tracking.
+    """
+
+    __tablename__ = "jira_tickets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    alert_id: Mapped[int] = mapped_column(ForeignKey("alerts.id"), unique=True)
+
+    ticket_key: Mapped[str] = mapped_column(String(50))
+    ticket_url: Mapped[str] = mapped_column(String(500))
+    summary: Mapped[str] = mapped_column(String(500))
+    priority: Mapped[str] = mapped_column(String(50))
+    assignee: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    dry_run: Mapped[bool] = mapped_column(default=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow
+    )
+
+    job: Mapped["Job"] = relationship(back_populates="jira_tickets")
+    alert: Mapped["Alert"] = relationship(back_populates="jira_ticket")

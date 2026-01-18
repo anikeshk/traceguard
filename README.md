@@ -4,6 +4,8 @@
 
 TraceGuard closes the gap between security findings and developer action. It ingests GitHub Dependabot alerts, translates them into developer-friendly guidance using AI, resolves ownership, and creates actionable Jira tickets—all with full transparency and auditability.
 
+https://github.com/user-attachments/assets/9b7cd5f1-7661-415c-90cf-5e81ae4484d8
+
 ## Features
 
 - **GitHub Security Intake** — Fetches open Dependabot alerts with CVE metadata
